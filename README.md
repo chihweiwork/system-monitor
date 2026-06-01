@@ -40,47 +40,34 @@ Every panel supports detailed popup views with:
 
 ### Download Pre-built Binary (Linux x86_64)
 
-**Two versions available:**
+**Choose your version** based on your operating system:
 
-#### Option 1: Static Binary (Recommended for Red Hat/CentOS)
+| Your System | Version to Download | Works On |
+|-------------|---------------------|----------|
+| 🔴 **Red Hat / CentOS / Rocky** | [**Static Build**](release/v0.1.0/redhat/) | RHEL 6/7/8/9, CentOS, Rocky, AlmaLinux (all versions) |
+| 🔵 **Ubuntu / Debian** | [**Dynamic Build**](release/v0.1.0/debian/) | Ubuntu 22.04+, Debian 12+, RHEL 9+ |
+| 🟢 **Not Sure?** | [**Static Build**](release/v0.1.0/redhat/) | Works everywhere (recommended) |
 
-Works on **any Linux distribution** (RHEL 6/7/8/9, CentOS, Ubuntu, Debian, etc.):
+#### Quick Install
 
 ```bash
-# Download the static release
+# For Red Hat / CentOS / Rocky / any Linux (static build)
 wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64-static.tar.gz
-
-# Verify checksum (optional but recommended)
-echo "f919614e0a468eb87a0acbe34e098aff5d60cda6eaa5a123a99d9a82a57c1391  system-monitor-v0.1.0-linux-x86_64-static.tar.gz" | sha256sum -c
-
-# Extract
 tar -xzf system-monitor-v0.1.0-linux-x86_64-static.tar.gz
-
-# Make executable and move to PATH
-chmod +x system-monitor
 sudo mv system-monitor /usr/local/bin/
-
-# Run
 system-monitor
-```
 
-#### Option 2: Dynamic Binary (For modern systems)
-
-Requires **GLIBC 2.34+** (Ubuntu 22.04+, RHEL 9+, Debian 12+):
-
-```bash
-# Download the dynamic release
+# For Ubuntu 22.04+ / Debian 12+ (dynamic build, smaller)
 wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64.tar.gz
-
-# Verify checksum
-echo "cabdf7a3314a8970b2f35ce2f5f5b4f50f1ecb035e5a80e57bc5f99c8a6efb29  system-monitor-v0.1.0-linux-x86_64.tar.gz" | sha256sum -c
-
-# Extract and install
 tar -xzf system-monitor-v0.1.0-linux-x86_64.tar.gz
-chmod +x system-monitor
 sudo mv system-monitor /usr/local/bin/
 system-monitor
 ```
+
+📖 **Detailed installation guides** (with checksums, troubleshooting, and multiple install methods):
+- [Red Hat / CentOS Installation Guide](release/v0.1.0/redhat/README.md)
+- [Ubuntu / Debian Installation Guide](release/v0.1.0/debian/README.md)
+- [Version Comparison & Selection Guide](release/v0.1.0/README.md)
 
 ### Build from Source
 
@@ -231,6 +218,10 @@ system-monitor/
 │       ├── error.rs         # Error handling
 │       ├── config.rs        # Configuration
 │       └── types.rs         # Common types
+├── release/                 # Pre-built binaries
+│   └── v0.1.0/
+│       ├── redhat/          # Static builds (RHEL, CentOS, etc.)
+│       └── debian/          # Dynamic builds (Ubuntu, Debian, etc.)
 ├── atop/                    # Reference: atop source code
 ├── btop/                    # Reference: btop source code
 ├── iotop/                   # Reference: iotop source code
