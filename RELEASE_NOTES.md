@@ -37,17 +37,43 @@ All 6 panels feature consistent popup windows (press `d`):
 
 ### Download Binary
 
+**Two builds available:**
+
+#### Static Binary (Recommended - Works Everywhere)
+
+✅ **Works on all Linux distributions** including:
+- Red Hat Enterprise Linux (RHEL) 6/7/8/9
+- CentOS 6/7/8 Stream
+- Rocky Linux / AlmaLinux
+- Ubuntu (all versions)
+- Debian (all versions)
+- Any other Linux distribution
+
 ```bash
-# Download
+# Download static build
+wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64-static.tar.gz
+
+# Verify checksum
+echo "f919614e0a468eb87a0acbe34e098aff5d60cda6eaa5a123a99d9a82a57c1391  system-monitor-v0.1.0-linux-x86_64-static.tar.gz" | sha256sum -c
+
+# Extract and run
+tar -xzf system-monitor-v0.1.0-linux-x86_64-static.tar.gz
+./system-monitor
+```
+
+#### Dynamic Binary (Smaller, Modern Systems Only)
+
+⚠️ **Requires GLIBC 2.34+** (Ubuntu 22.04+, RHEL 9+, Debian 12+)
+
+```bash
+# Download dynamic build
 wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64.tar.gz
 
 # Verify checksum
 echo "cabdf7a3314a8970b2f35ce2f5f5b4f50f1ecb035e5a80e57bc5f99c8a6efb29  system-monitor-v0.1.0-linux-x86_64.tar.gz" | sha256sum -c
 
-# Extract
+# Extract and run
 tar -xzf system-monitor-v0.1.0-linux-x86_64.tar.gz
-
-# Run
 ./system-monitor
 ```
 
@@ -111,8 +137,21 @@ All indexed with GitNexus for code intelligence.
 ## 📝 SHA256 Checksums
 
 ```
+f919614e0a468eb87a0acbe34e098aff5d60cda6eaa5a123a99d9a82a57c1391  system-monitor-v0.1.0-linux-x86_64-static.tar.gz
 cabdf7a3314a8970b2f35ce2f5f5b4f50f1ecb035e5a80e57bc5f99c8a6efb29  system-monitor-v0.1.0-linux-x86_64.tar.gz
 ```
+
+## 📋 Binary Comparison
+
+| Build Type | Size | GLIBC Required | Compatible With |
+|------------|------|----------------|-----------------|
+| **Static** | 787 KB | None (musl) | All Linux distributions (RHEL 6+, Ubuntu, Debian, etc.) |
+| **Dynamic** | 734 KB | 2.34+ | Modern distributions only (Ubuntu 22.04+, RHEL 9+) |
+
+**Recommendation**: Use the **static build** for maximum compatibility, especially on:
+- Red Hat Enterprise Linux (any version)
+- CentOS / Rocky Linux / AlmaLinux
+- Production servers with older base systems
 
 ## 🙏 Credits
 

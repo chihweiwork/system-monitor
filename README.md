@@ -40,21 +40,45 @@ Every panel supports detailed popup views with:
 
 ### Download Pre-built Binary (Linux x86_64)
 
+**Two versions available:**
+
+#### Option 1: Static Binary (Recommended for Red Hat/CentOS)
+
+Works on **any Linux distribution** (RHEL 6/7/8/9, CentOS, Ubuntu, Debian, etc.):
+
 ```bash
-# Download the latest release
-wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64.tar.gz
+# Download the static release
+wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64-static.tar.gz
 
 # Verify checksum (optional but recommended)
-echo "cabdf7a3314a8970b2f35ce2f5f5b4f50f1ecb035e5a80e57bc5f99c8a6efb29  system-monitor-v0.1.0-linux-x86_64.tar.gz" | sha256sum -c
+echo "f919614e0a468eb87a0acbe34e098aff5d60cda6eaa5a123a99d9a82a57c1391  system-monitor-v0.1.0-linux-x86_64-static.tar.gz" | sha256sum -c
 
 # Extract
-tar -xzf system-monitor-v0.1.0-linux-x86_64.tar.gz
+tar -xzf system-monitor-v0.1.0-linux-x86_64-static.tar.gz
 
 # Make executable and move to PATH
 chmod +x system-monitor
 sudo mv system-monitor /usr/local/bin/
 
 # Run
+system-monitor
+```
+
+#### Option 2: Dynamic Binary (For modern systems)
+
+Requires **GLIBC 2.34+** (Ubuntu 22.04+, RHEL 9+, Debian 12+):
+
+```bash
+# Download the dynamic release
+wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64.tar.gz
+
+# Verify checksum
+echo "cabdf7a3314a8970b2f35ce2f5f5b4f50f1ecb035e5a80e57bc5f99c8a6efb29  system-monitor-v0.1.0-linux-x86_64.tar.gz" | sha256sum -c
+
+# Extract and install
+tar -xzf system-monitor-v0.1.0-linux-x86_64.tar.gz
+chmod +x system-monitor
+sudo mv system-monitor /usr/local/bin/
 system-monitor
 ```
 
