@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use std::fs;
 use std::collections::HashMap;
 use std::ffi::CStr;
+use crate::gpu::GpuProcessType;
 
 #[derive(Debug, Clone)]
 pub struct ProcessStats {
@@ -23,6 +24,10 @@ pub struct ProcessStats {
     pub io_write_bytes: u64,
     pub io_read_rate: f64,
     pub io_write_rate: f64,
+    // GPU fields
+    pub gpu_memory_mb: u64,
+    pub gpu_utilization: u32,
+    pub gpu_type: Option<GpuProcessType>,
 }
 
 pub struct ProcessCollector {
@@ -301,6 +306,10 @@ impl ProcessCollector {
             io_write_bytes,
             io_read_rate,
             io_write_rate,
+            // GPU fields (will be filled by main loop)
+            gpu_memory_mb: 0,
+            gpu_utilization: 0,
+            gpu_type: None,
         })
     }
 }
