@@ -3,6 +3,7 @@ use super::Collector;
 use async_trait::async_trait;
 use std::fs;
 use std::collections::HashMap;
+use std::ffi::CStr;
 
 #[derive(Debug, Clone)]
 pub struct ProcessStats {
@@ -156,7 +157,20 @@ impl ProcessCollector {
     }
 
     fn uid_to_username(&self, uid: u32) -> String {
-        // Read /etc/passwd to convert UID to username
+        // Method 1: Use libc::getpwuid() for NSS/LDAP/AD support
+        unsafe {
+            let passwd_ptr = libc::getpwuid(uid);
+            if !passwd_ptr.is_null() {
+                let passwd = &*passwd_ptr;
+                if !passwd.pw_name.is_null() {
+                    if let Ok(cstr) = CStr::from_ptr(passwd.pw_name).to_str() {
+                        return cstr.to_string();
+                    }
+                }
+            }
+        }
+
+        // Method 2: Fallback to /etc/passwd (for systems without NSS or cached lookup)
         if let Ok(content) = fs::read_to_string("/etc/passwd") {
             for line in content.lines() {
                 let parts: Vec<&str> = line.split(':').collect();
@@ -169,7 +183,8 @@ impl ProcessCollector {
                 }
             }
         }
-        // Fallback to UID as string
+
+        // Method 3: Final fallback to UID as string
         uid.to_string()
     }
 
