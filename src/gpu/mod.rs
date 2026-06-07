@@ -11,6 +11,22 @@ use async_trait::async_trait;
 use std::fs;
 use std::path::Path;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum GpuProcessType {
+    Graphics,     // Graphics rendering
+    Compute,      // Compute tasks
+    Both,         // Both graphics and compute
+}
+
+#[derive(Debug, Clone)]
+pub struct GpuProcess {
+    pub pid: u32,
+    pub process_name: String,
+    pub gpu_memory_mb: u64,        // GPU memory usage (MB)
+    pub gpu_utilization: u32,      // GPU utilization (0-100)
+    pub process_type: GpuProcessType,
+}
+
 #[derive(Debug, Clone)]
 pub struct GpuStats {
     pub name: String,
@@ -20,6 +36,8 @@ pub struct GpuStats {
     pub memory_total_mb: u64,
     pub temperature_c: f64,
     pub power_watts: f64,
+    pub processes: Vec<GpuProcess>,  // Processes running on this GPU
+    pub gpu_id: u32,                 // GPU ID
 }
 
 // Note: We can't use async fn in traits for dyn dispatch

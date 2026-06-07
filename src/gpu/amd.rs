@@ -49,8 +49,8 @@ impl AmdBackend {
     pub async fn collect_stats(&self) -> Result<Vec<GpuStats>> {
         let mut stats = Vec::new();
 
-        for device in &self.devices {
-            match self.read_device_stats(device) {
+        for (gpu_id, device) in self.devices.iter().enumerate() {
+            match self.read_device_stats(device, gpu_id as u32) {
                 Ok(stat) => stats.push(stat),
                 Err(e) => {
                     eprintln!("Failed to read AMD GPU stats: {}", e);
@@ -65,7 +65,7 @@ impl AmdBackend {
         Ok(stats)
     }
 
-    fn read_device_stats(&self, device_path: &Path) -> Result<GpuStats> {
+    fn read_device_stats(&self, device_path: &Path, gpu_id: u32) -> Result<GpuStats> {
         // Read device name
         let name_path = device_path.join("device/device");
         let name = read_sysfs_string(&name_path)
@@ -124,6 +124,8 @@ impl AmdBackend {
             memory_total_mb,
             temperature_c,
             power_watts,
+            processes: Vec::new(),
+            gpu_id,
         })
     }
 }
