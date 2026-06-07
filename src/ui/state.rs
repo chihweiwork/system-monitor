@@ -190,6 +190,15 @@ impl DetailSortField {
                 Cpu => Pid,
                 _ => Pid,
             },
+            DetailPopupType::Process => match self {
+                Pid => User,
+                User => Name,
+                Name => Cpu,
+                Cpu => Memory,
+                Memory => MemorySize,
+                MemorySize => Pid,
+                _ => Pid,
+            },
             DetailPopupType::DiskIo => match self {
                 Pid => Name,
                 Name => User,
@@ -263,6 +272,7 @@ impl DetailSortField {
 pub enum DetailPopupType {
     Cpu,
     Memory,
+    Process,
     DiskIo,
     Network,
     DiskUsage,
@@ -277,6 +287,8 @@ pub struct DetailPopupState {
     pub search_mode: bool,
     pub sort_field: DetailSortField,
     pub sort_order: SortOrder,
+    pub show_full_command: bool,
+    pub selected_index: Option<usize>,
 }
 
 impl DetailPopupState {
@@ -288,12 +300,15 @@ impl DetailPopupState {
             sort_field: match popup_type {
                 DetailPopupType::Cpu => DetailSortField::CpuTotal,
                 DetailPopupType::Memory => DetailSortField::Memory,
+                DetailPopupType::Process => DetailSortField::Cpu,
                 DetailPopupType::DiskIo => DetailSortField::IoTotal,
                 DetailPopupType::Network => DetailSortField::Cpu,
                 DetailPopupType::DiskUsage => DetailSortField::DiskUsage,
                 DetailPopupType::Gpu => DetailSortField::GpuUtil,
             },
             sort_order: SortOrder::Descending,
+            show_full_command: false,
+            selected_index: None,
         }
     }
 
@@ -311,6 +326,40 @@ impl DetailPopupState {
             self.search_text.clear();
         }
     }
+
+    pub fn toggle_full_command(&mut self) {
+        self.show_full_command = !self.show_full_command;
+    }
+
+    pub fn select_next(&mut self, max_len: usize, visible_height: usize) {
+        if let Some(idx) = self.selected_index {
+            if idx + 1 < max_len {
+                self.selected_index = Some(idx + 1);
+                // Auto-scroll if needed
+                if idx + 1 >= self.scroll_offset + visible_height {
+                    self.scroll_offset = (idx + 2).saturating_sub(visible_height);
+                }
+            }
+        } else if max_len > 0 {
+            self.selected_index = Some(0);
+        }
+    }
+
+    pub fn select_prev(&mut self, visible_height: usize) {
+        if let Some(idx) = self.selected_index {
+            if idx > 0 {
+                self.selected_index = Some(idx - 1);
+                // Auto-scroll if needed
+                if idx - 1 < self.scroll_offset {
+                    self.scroll_offset = idx - 1;
+                }
+            }
+        }
+    }
+
+    pub fn get_selected_index(&self) -> Option<usize> {
+        self.selected_index
+    }
 }
 
 #[derive(Clone)]
@@ -321,6 +370,7 @@ pub struct AppState {
     pub filter_text: String,
     pub modal_active: bool,
     pub selected_process_index: Option<usize>,
+    pub selected_process_pid: Option<u32>,
     pub help_visible: bool,
     pub sort_field: SortField,
     pub sort_order: SortOrder,
@@ -328,6 +378,9 @@ pub struct AppState {
     pub show_full_command: bool,
     pub detail_popup: Option<DetailPopupState>,
     pub detail_popup_type: DetailPopupType,
+    pub opened_by_key: Option<char>,
+    pub popup_modal_active: bool,
+    pub popup_selected_process_pid: Option<u32>,
 }
 
 impl AppState {
@@ -349,6 +402,7 @@ impl AppState {
             filter_text: String::new(),
             modal_active: false,
             selected_process_index: None,
+            selected_process_pid: None,
             help_visible: false,
             sort_field: SortField::Cpu,
             sort_order: SortOrder::Descending,
@@ -356,6 +410,9 @@ impl AppState {
             show_full_command: false,
             detail_popup: None,
             detail_popup_type: DetailPopupType::DiskIo,
+            opened_by_key: None,
+            popup_modal_active: false,
+            popup_selected_process_pid: None,
         }
     }
 
@@ -426,6 +483,9 @@ impl AppState {
 
     pub fn toggle_modal(&mut self) {
         self.modal_active = !self.modal_active;
+        if !self.modal_active {
+            self.selected_process_pid = None;
+        }
     }
 
     pub fn toggle_help(&mut self) {
@@ -464,17 +524,53 @@ impl AppState {
         self.show_full_command
     }
 
-    pub fn open_detail_popup(&mut self, popup_type: DetailPopupType) {
+    pub fn open_detail_popup(&mut self, popup_type: DetailPopupType, key: Option<char>) {
         self.detail_popup = Some(DetailPopupState::new(popup_type));
         self.detail_popup_type = popup_type;
+        self.opened_by_key = key;
     }
 
     pub fn close_detail_popup(&mut self) {
         self.detail_popup = None;
+        self.opened_by_key = None;
     }
 
     pub fn is_detail_popup_open(&self) -> bool {
         self.detail_popup.is_some()
+    }
+
+    pub fn open_popup_modal(&mut self, pid: u32) {
+        self.popup_modal_active = true;
+        self.popup_selected_process_pid = Some(pid);
+    }
+
+    pub fn close_popup_modal(&mut self) {
+        self.popup_modal_active = false;
+        self.popup_selected_process_pid = None;
+    }
+
+    /// Handle 'q' or 'ESC' key - close windows in priority order
+    /// Returns true if a window was closed, false if should quit app
+    pub fn handle_close_key(&mut self) -> bool {
+        if self.help_visible {
+            self.toggle_help();
+            true
+        } else if self.popup_modal_active {
+            self.close_popup_modal();
+            true
+        } else if self.is_detail_popup_open() {
+            self.close_detail_popup();
+            true
+        } else if self.modal_active {
+            self.toggle_modal();
+            true
+        } else if self.filter_active {
+            self.toggle_filter();
+            true
+        } else {
+            // No windows open, should quit
+            false
+        }
     }
 }
 

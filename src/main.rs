@@ -24,9 +24,17 @@ use ui::{
 use std::time::Duration;
 use crossterm::event::{Event, KeyCode, MouseEvent, MouseEventKind, MouseButton};
 use ratatui::layout::{Constraint, Direction, Layout, Rect, Alignment};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Paragraph, Clear};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
+
+#[derive(Debug, Clone)]
+struct TitleBarTab {
+    panel: ViewMode,
+    key: char,
+    x_start: u16,
+    x_end: u16,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -75,8 +83,10 @@ async fn run_app() -> Result<()> {
     let update_interval = Duration::from_millis(1000);
     let mut last_update = tokio::time::Instant::now();
 
-    // Store panel_rects for mouse event handling
+    // Store panel_rects and title bar tabs for mouse event handling
     let mut panel_rects: Vec<ui::PanelRect> = Vec::new();
+    let mut title_bar_rect: Option<Rect> = None;
+    let mut title_bar_tabs: Vec<TitleBarTab> = Vec::new();
     let mut pending_mouse_event: Option<MouseEvent> = None;
 
     loop {
@@ -84,22 +94,27 @@ async fn run_app() -> Result<()> {
         if let Some(event) = ui.poll_event(Duration::from_millis(50))? {
             match event {
                 Event::Key(key_event) => {
-                    // Priority: handle detail popup events first
+                    // Priority: handle popup modal events first
+                    if app_state.popup_modal_active {
+                        match key_event.code {
+                            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter => {
+                                app_state.close_popup_modal();
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+
+                    // Then handle detail popup events
                     if app_state.is_detail_popup_open() {
-                        handle_detail_popup_input(key_event.code, &mut app_state);
+                        // Use approximate values - exact count will be handled in main loop
+                        handle_detail_popup_input(key_event.code, &mut app_state, processes.len(), 20);
                         continue;
                     }
 
                     match key_event.code {
-                        KeyCode::Char('q') | KeyCode::Char('Q') if !app_state.filter_active => break,
-                        KeyCode::Esc => {
-                            if app_state.help_visible {
-                                app_state.toggle_help();
-                            } else if app_state.modal_active {
-                                app_state.toggle_modal();
-                            } else if app_state.filter_active {
-                                app_state.toggle_filter();
-                            } else {
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc if !app_state.filter_active => {
+                            if !app_state.handle_close_key() {
                                 break;
                             }
                         }
@@ -107,39 +122,89 @@ async fn run_app() -> Result<()> {
                         // Panel toggling
                         KeyCode::Tab if !app_state.filter_active => app_state.next_view(),
                         KeyCode::BackTab if !app_state.filter_active => app_state.prev_view(),
-                        KeyCode::Char('1') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::Cpu); },
-                        KeyCode::Char('2') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::Memory); },
-                        KeyCode::Char('3') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::Processes); },
-                        KeyCode::Char('4') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::Network); },
-                        KeyCode::Char('5') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::DiskIo); },
-                        KeyCode::Char('6') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::DiskUsage); },
-                        KeyCode::Char('7') if !app_state.filter_active => { app_state.toggle_panel(ViewMode::Gpu); },
+
+                        // Number keys toggle detail popup for corresponding panel
+                        KeyCode::Char('1') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('1') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Cpu;
+                                app_state.open_detail_popup(ui::DetailPopupType::Cpu, Some('1'));
+                            }
+                        },
+                        KeyCode::Char('2') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('2') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Memory;
+                                app_state.open_detail_popup(ui::DetailPopupType::Memory, Some('2'));
+                            }
+                        },
+                        KeyCode::Char('3') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('3') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Processes;
+                                app_state.open_detail_popup(ui::DetailPopupType::Process, Some('3'));
+                            }
+                        },
+                        KeyCode::Char('4') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('4') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Network;
+                                app_state.open_detail_popup(ui::DetailPopupType::Network, Some('4'));
+                            }
+                        },
+                        KeyCode::Char('5') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('5') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::DiskIo;
+                                app_state.open_detail_popup(ui::DetailPopupType::DiskIo, Some('5'));
+                            }
+                        },
+                        KeyCode::Char('6') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('6') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::DiskUsage;
+                                app_state.open_detail_popup(ui::DetailPopupType::DiskUsage, Some('6'));
+                            }
+                        },
+                        KeyCode::Char('7') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('7') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Gpu;
+                                app_state.open_detail_popup(ui::DetailPopupType::Gpu, Some('7'));
+                            }
+                        },
 
                         // Detail mode toggle
                         KeyCode::Char('d') if !app_state.filter_active && !app_state.modal_active && !app_state.is_detail_popup_open() => {
                             // Most panels use popup window
                             match app_state.active_panel {
                                 ViewMode::Cpu => {
-                                    app_state.open_detail_popup(ui::DetailPopupType::Cpu);
+                                    app_state.open_detail_popup(ui::DetailPopupType::Cpu, None);
                                 }
                                 ViewMode::Memory => {
-                                    app_state.open_detail_popup(ui::DetailPopupType::Memory);
+                                    app_state.open_detail_popup(ui::DetailPopupType::Memory, None);
+                                }
+                                ViewMode::Processes => {
+                                    app_state.open_detail_popup(ui::DetailPopupType::Process, None);
                                 }
                                 ViewMode::DiskIo => {
-                                    app_state.open_detail_popup(ui::DetailPopupType::DiskIo);
+                                    app_state.open_detail_popup(ui::DetailPopupType::DiskIo, None);
                                 }
                                 ViewMode::Network => {
-                                    app_state.open_detail_popup(ui::DetailPopupType::Network);
+                                    app_state.open_detail_popup(ui::DetailPopupType::Network, None);
                                 }
                                 ViewMode::DiskUsage => {
-                                    app_state.open_detail_popup(ui::DetailPopupType::DiskUsage);
+                                    app_state.open_detail_popup(ui::DetailPopupType::DiskUsage, None);
                                 }
                                 ViewMode::Gpu => {
-                                    app_state.open_detail_popup(ui::DetailPopupType::Gpu);
-                                }
-                                _ => {
-                                    // Fallback to inline detail mode
-                                    app_state.toggle_detail_mode(app_state.active_panel);
+                                    app_state.open_detail_popup(ui::DetailPopupType::Gpu, None);
                                 }
                             }
                         }
@@ -303,7 +368,62 @@ async fn run_app() -> Result<()> {
 
         // Handle pending mouse event after displayed_processes is ready
         if let Some(mouse_event) = pending_mouse_event.take() {
-            handle_mouse_event(mouse_event, &panel_rects, &mut app_state, &mut process_widget, &displayed_processes);
+            let (width, height) = ui.size()?;
+            let terminal_size = Rect { x: 0, y: 0, width, height };
+            handle_mouse_event(
+                mouse_event,
+                &panel_rects,
+                title_bar_rect,
+                &title_bar_tabs,
+                &mut app_state,
+                &mut process_widget,
+                &displayed_processes,
+                terminal_size
+            );
+        }
+
+        // Update selected_process_pid from sorted list if modal was just opened
+        if app_state.modal_active && app_state.active_panel == ViewMode::Processes {
+            if app_state.selected_process_pid.is_none() {
+                if let Some(idx) = app_state.selected_process_index {
+                    if idx < displayed_processes.len() {
+                        app_state.selected_process_pid = Some(displayed_processes[idx].pid);
+                    }
+                }
+            }
+        }
+
+        // Update popup_selected_process_pid from sorted list if popup modal was just opened
+        if app_state.popup_modal_active {
+            if app_state.popup_selected_process_pid == Some(0) {
+                if let Some(popup_state) = &app_state.detail_popup {
+                    if let Some(idx) = popup_state.get_selected_index() {
+                        if idx < displayed_processes.len() {
+                            app_state.popup_selected_process_pid = Some(displayed_processes[idx].pid);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if modal is open but process no longer exists
+        if app_state.modal_active && app_state.active_panel == ViewMode::Processes {
+            if let Some(pid) = app_state.selected_process_pid {
+                if !displayed_processes.iter().any(|p| p.pid == pid) {
+                    // Process has exited, close modal
+                    app_state.toggle_modal();
+                }
+            }
+        }
+
+        // Check if popup modal is open but process no longer exists
+        if app_state.popup_modal_active {
+            if let Some(pid) = app_state.popup_selected_process_pid {
+                if pid != 0 && !displayed_processes.iter().any(|p| p.pid == pid) {
+                    // Process has exited, close popup modal
+                    app_state.close_popup_modal();
+                }
+            }
         }
 
         // Render UI
@@ -331,6 +451,10 @@ async fn run_app() -> Result<()> {
                 ])
                 .split(size);
 
+            // Calculate title bar tabs for mouse click detection
+            title_bar_rect = Some(chunks[0]);
+            title_bar_tabs = calculate_title_bar_tabs(chunks[0]);
+
             let layout = MultiPanelLayout::new();
             if layout.validate_minimum_size(chunks[1]).is_ok() {
                 panel_rects = layout.calculate(chunks[1], &state.visible_panels);
@@ -339,6 +463,8 @@ async fn run_app() -> Result<()> {
             }
         } else {
             panel_rects.clear();
+            title_bar_rect = None;
+            title_bar_tabs.clear();
         }
 
         ui.render(|frame| {
@@ -406,10 +532,12 @@ async fn run_app() -> Result<()> {
 
             // Modal
             if state.modal_active && state.active_panel == ViewMode::Processes {
-                if let Some(idx) = process_widget.selected_index().checked_sub(0) {
-                    if idx < processes_clone.len() {
-                        render_process_modal(frame, size, &processes_clone[idx], &theme);
+                if let Some(pid) = state.selected_process_pid {
+                    // Find process by PID
+                    if let Some(process) = processes_clone.iter().find(|p| p.pid == pid) {
+                        render_process_modal(frame, size, process, &theme);
                     }
+                    // If process not found, it will be handled after render
                 }
             }
 
@@ -427,6 +555,17 @@ async fn run_app() -> Result<()> {
                         Some(&gpu_stats_clone),
                         &theme,
                     );
+                }
+            }
+
+            // Popup modal (nested inside detail popup)
+            if state.popup_modal_active {
+                if let Some(pid) = state.popup_selected_process_pid {
+                    if pid != 0 {
+                        if let Some(process) = processes_clone.iter().find(|p| p.pid == pid) {
+                            render_process_modal(frame, size, process, &theme);
+                        }
+                    }
                 }
             }
         })?;
@@ -462,6 +601,8 @@ fn handle_cpu_detail_input(
 fn handle_detail_popup_input(
     key: KeyCode,
     app_state: &mut AppState,
+    process_count: usize,
+    visible_height: usize,
 ) {
     let popup_type = app_state.detail_popup_type;
     if let Some(popup_state) = &mut app_state.detail_popup {
@@ -520,6 +661,25 @@ fn handle_detail_popup_input(
                     popup_state.sort_order = popup_state.sort_order.toggle();
                     popup_state.scroll_offset = 0;
                 }
+                KeyCode::Char('c') if popup_type == ui::DetailPopupType::Process => {
+                    // Toggle full command display for Process popup
+                    popup_state.toggle_full_command();
+                }
+                KeyCode::Up if popup_type == ui::DetailPopupType::Process => {
+                    // Arrow up for selection in Process popup
+                    popup_state.select_prev(visible_height);
+                }
+                KeyCode::Down if popup_type == ui::DetailPopupType::Process => {
+                    // Arrow down for selection in Process popup
+                    popup_state.select_next(process_count, visible_height);
+                }
+                KeyCode::Enter if popup_type == ui::DetailPopupType::Process => {
+                    // Enter to open nested modal for selected process
+                    if let Some(selected_idx) = popup_state.get_selected_index() {
+                        // PID will be set in main loop from the filtered process list
+                        app_state.open_popup_modal(0); // Placeholder PID
+                    }
+                }
                 _ => {}
             }
         }
@@ -538,9 +698,11 @@ fn handle_process_view_input(
 
     if state.filter_active {
         match key {
-            KeyCode::Char(c) => state.add_filter_char(c),
+            KeyCode::Char(c) if c != 'q' && c != 'Q' => state.add_filter_char(c),
             KeyCode::Backspace => state.remove_filter_char(),
-            KeyCode::Enter | KeyCode::Esc => state.toggle_filter(),
+            KeyCode::Enter | KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+                state.toggle_filter();
+            }
             _ => {}
         }
         return;
@@ -608,7 +770,9 @@ fn handle_process_view_input(
 
         // Modal
         KeyCode::Enter => {
-            state.selected_process_index = Some(widget.selected_index());
+            let idx = widget.selected_index();
+            state.selected_process_index = Some(idx);
+            // selected_process_pid will be set in main loop after sorting
             state.toggle_modal();
         }
 
@@ -630,6 +794,37 @@ fn sort_processes(processes: &mut [ProcessStats], field: SortField, order: SortO
             SortOrder::Descending => cmp.reverse(),
         }
     });
+}
+
+fn calculate_title_bar_tabs(area: Rect) -> Vec<TitleBarTab> {
+    let tabs = [
+        (ViewMode::Cpu, '1', "1:CPU"),
+        (ViewMode::Memory, '2', "2:Mem"),
+        (ViewMode::Processes, '3', "3:Proc"),
+        (ViewMode::Network, '4', "4:Net"),
+        (ViewMode::DiskIo, '5', "5:I/O"),
+        (ViewMode::DiskUsage, '6', "6:Disk"),
+        (ViewMode::Gpu, '7', "7:GPU"),
+    ];
+
+    let mut result = Vec::new();
+    let mut x_offset = area.x;
+
+    for (panel, key, label) in tabs.iter() {
+        let label_with_spaces = format!(" {} ", label);
+        let label_width = label_with_spaces.len() as u16;
+
+        result.push(TitleBarTab {
+            panel: *panel,
+            key: *key,
+            x_start: x_offset,
+            x_end: x_offset + label_width,
+        });
+
+        x_offset += label_width + 1; // +1 for the space separator
+    }
+
+    result
 }
 
 fn render_title_bar(frame: &mut ratatui::Frame, area: Rect, state: &AppState) {
@@ -717,6 +912,9 @@ fn render_process_modal(
         height: modal_height,
     };
 
+    // Clear the background to make modal opaque
+    frame.render_widget(Clear, modal_area);
+
     let block = Block::default()
         .title(format!(" Process Details: {} ", process.name))
         .borders(Borders::ALL)
@@ -787,9 +985,12 @@ fn render_process_modal(
 fn handle_mouse_event(
     mouse_event: MouseEvent,
     panel_rects: &[ui::PanelRect],
+    title_bar_rect: Option<Rect>,
+    title_bar_tabs: &[TitleBarTab],
     state: &mut AppState,
     process_widget: &mut ProcessWidget,
     processes: &[ProcessStats],
+    terminal_size: Rect,
 ) {
     // Only handle left clicks
     if !matches!(mouse_event.kind, MouseEventKind::Down(MouseButton::Left)) {
@@ -798,6 +999,84 @@ fn handle_mouse_event(
 
     let click_x = mouse_event.column;
     let click_y = mouse_event.row;
+
+    // Priority 1: Check if detail popup is open and handle clicks within it
+    if state.is_detail_popup_open() && state.detail_popup_type == ui::DetailPopupType::Process {
+        if let Some(popup_state) = &mut state.detail_popup {
+            // Calculate popup area (same as in render_detail_popup)
+            let area_width = terminal_size.width;
+            let area_height = terminal_size.height;
+            let popup_width = ((area_width as f32 * 0.8).min(120.0) as u16).max(60);
+            let popup_height = ((area_height as f32 * 0.8).min(40.0) as u16).max(20);
+            let x = (area_width.saturating_sub(popup_width)) / 2;
+            let y = (area_height.saturating_sub(popup_height)) / 2;
+
+            let popup_x = x;
+            let popup_y = y;
+
+            // Check if click is within popup bounds
+            if click_x >= popup_x && click_x < popup_x + popup_width
+                && click_y >= popup_y && click_y < popup_y + popup_height {
+
+                // Account for border (1) + title (1) + header (1) = 3 rows
+                let content_start_y = popup_y + 3;
+
+                if click_y >= content_start_y && click_y < popup_y + popup_height - 1 {
+                    // Adjust for mouse cursor position
+                    let adjusted_y = if click_y > content_start_y { click_y - 1 } else { click_y };
+                    let clicked_row = (adjusted_y.saturating_sub(content_start_y)) as usize;
+                    let process_index = popup_state.scroll_offset + clicked_row;
+
+                    // Select the process and open nested modal
+                    if process_index < processes.len() {
+                        popup_state.selected_index = Some(process_index);
+                        // Auto-scroll if needed
+                        let visible_height = popup_height.saturating_sub(4) as usize;
+                        if process_index >= popup_state.scroll_offset + visible_height {
+                            popup_state.scroll_offset = (process_index + 1).saturating_sub(visible_height);
+                        } else if process_index < popup_state.scroll_offset {
+                            popup_state.scroll_offset = process_index;
+                        }
+
+                        // Open nested modal with the selected process PID
+                        let pid = processes[process_index].pid;
+                        state.open_popup_modal(pid);
+                    }
+                }
+                return; // Click was in popup, don't process further
+            }
+        }
+    }
+
+    // Check if title bar was clicked
+    if let Some(title_rect) = title_bar_rect {
+        if click_y == title_rect.y {
+            // Check which tab was clicked
+            for tab in title_bar_tabs {
+                if click_x >= tab.x_start && click_x < tab.x_end {
+                    // Trigger the same behavior as pressing the number key
+                    let popup_type = match tab.panel {
+                        ViewMode::Cpu => ui::DetailPopupType::Cpu,
+                        ViewMode::Memory => ui::DetailPopupType::Memory,
+                        ViewMode::Processes => ui::DetailPopupType::Process,
+                        ViewMode::Network => ui::DetailPopupType::Network,
+                        ViewMode::DiskIo => ui::DetailPopupType::DiskIo,
+                        ViewMode::DiskUsage => ui::DetailPopupType::DiskUsage,
+                        ViewMode::Gpu => ui::DetailPopupType::Gpu,
+                    };
+
+                    // Toggle behavior: close if same key, open otherwise
+                    if state.is_detail_popup_open() && state.opened_by_key == Some(tab.key) {
+                        state.close_detail_popup();
+                    } else {
+                        state.active_panel = tab.panel;
+                        state.open_detail_popup(popup_type, Some(tab.key));
+                    }
+                    return;
+                }
+            }
+        }
+    }
 
     // Find which panel was clicked
     for panel_rect in panel_rects {
@@ -808,16 +1087,22 @@ fn handle_mouse_event(
             if click_x >= rect.x && click_x < rect.x + rect.width
                 && click_y >= rect.y && click_y < rect.y + rect.height {
 
-                // Account for border (1) + title (1) + header (1) = 3 rows
-                let content_start_y = rect.y + 3;
+                // Account for header (1 row) - rect is already inner area without border/title
+                let content_start_y = rect.y + 1;
 
-                if click_y >= content_start_y {
-                    let clicked_row = (click_y - content_start_y) as usize;
+                if click_y >= content_start_y && click_y < rect.y + rect.height {
+                    // Adjust for mouse cursor position (cursor center vs arrow tip)
+                    let adjusted_y = if click_y > content_start_y { click_y - 1 } else { click_y };
+                    let clicked_row = (adjusted_y.saturating_sub(content_start_y)) as usize;
                     let process_index = process_widget.scroll_offset() + clicked_row;
 
                     if process_index < processes.len() {
                         process_widget.set_selected_index(process_index);
+                        process_widget.adjust_scroll(rect.height.saturating_sub(1) as usize);
                         state.active_panel = ViewMode::Processes;
+                        // Open modal to show process details (like pressing Enter)
+                        state.selected_process_index = Some(process_index);
+                        state.toggle_modal();
                     }
                 }
 

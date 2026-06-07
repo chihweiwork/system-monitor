@@ -49,6 +49,9 @@ pub fn render_detail_popup(
             // TODO: Implement Memory popup
             render_process_popup(frame, popup_area, popup_state, DetailPopupType::Memory, processes, theme);
         }
+        DetailPopupType::Process => {
+            render_process_list_popup(frame, popup_area, popup_state, processes, theme);
+        }
         DetailPopupType::DiskIo => {
             render_process_popup(frame, popup_area, popup_state, DetailPopupType::DiskIo, processes, theme);
         }
@@ -849,6 +852,177 @@ fn render_placeholder_popup(
             Span::styled("Press ESC to close", Style::default().fg(Color::DarkGray)),
         ]),
     ];
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+// Process List Popup - Show all processes
+fn render_process_list_popup(
+    frame: &mut Frame,
+    popup_area: Rect,
+    popup_state: &DetailPopupState,
+    processes: &[ProcessStats],
+    theme: &Theme,
+) {
+    // Filter by search text only (no type filtering)
+    let filtered_processes: Vec<&ProcessStats> = processes
+        .iter()
+        .filter(|p| {
+            if popup_state.search_text.is_empty() {
+                true
+            } else {
+                let search_lower = popup_state.search_text.to_lowercase();
+                p.name.to_lowercase().contains(&search_lower)
+                    || p.cmdline.to_lowercase().contains(&search_lower)
+                    || p.user.to_lowercase().contains(&search_lower)
+                    || p.pid.to_string().contains(&search_lower)
+            }
+        })
+        .collect();
+
+    // Sort processes
+    let mut sorted_processes = filtered_processes;
+    sort_processes(&mut sorted_processes, popup_state);
+
+    let title = format!(" All Processes ({}) ", sorted_processes.len());
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .style(Style::default().bg(Color::Black));
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let mut lines = Vec::new();
+
+    // Sort indicator
+    lines.push(Line::from(vec![
+        Span::styled("Sort by: ", Style::default().fg(Color::Gray)),
+        Span::styled(
+            format!("{} ", popup_state.sort_field.name()),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        ),
+        Span::styled(
+            match popup_state.sort_order {
+                SortOrder::Ascending => "↑",
+                SortOrder::Descending => "↓",
+            },
+            Style::default().fg(Color::Cyan)
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // Table header
+    let header = Line::from(vec![
+        Span::styled(format!("{:>7} ", "PID"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:<10} ", "USER"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:<30} ", "NAME"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>6} ", "CPU%"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>7} ", "MEM%"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>10}", "SIZE MB"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+    ]);
+    lines.push(header);
+
+    // Calculate visible rows
+    let header_lines = 4;
+    let footer_lines = 3;
+    let visible_rows = (inner.height as usize).saturating_sub(header_lines + footer_lines);
+
+    // Apply scroll offset and render process list
+    let visible_processes: Vec<_> = sorted_processes
+        .iter()
+        .skip(popup_state.scroll_offset)
+        .take(visible_rows)
+        .collect();
+
+    for (idx, process) in visible_processes.iter().enumerate() {
+        let absolute_index = popup_state.scroll_offset + idx;
+        let is_selected = popup_state.selected_index == Some(absolute_index);
+
+        let name_for_display = if popup_state.show_full_command {
+            // Show full command line, use name for kernel threads
+            let cmdline = if !process.cmdline.is_empty() {
+                process.cmdline.clone()
+            } else {
+                format!("[{}]", process.name)
+            };
+
+            if cmdline.len() > 30 {
+                format!("{}...", &cmdline[..27])
+            } else {
+                cmdline
+            }
+        } else {
+            // Show process name
+            if process.name.len() > 30 {
+                format!("{}...", &process.name[..27])
+            } else {
+                process.name.clone()
+            }
+        };
+        let size_mb = process.memory_kb as f64 / 1024.0;
+
+        let base_style = if is_selected {
+            Style::default().fg(Color::Black).bg(Color::Cyan)
+        } else {
+            Style::default()
+        };
+
+        let line = Line::from(vec![
+            Span::styled(
+                format!("{:>7} ", process.pid),
+                if is_selected { base_style } else { Style::default().fg(Color::Cyan) }
+            ),
+            Span::styled(
+                format!("{:<10} ", truncate_str(&process.user, 10)),
+                if is_selected { base_style } else { Style::default().fg(Color::Gray) }
+            ),
+            Span::styled(
+                format!("{:<30} ", name_for_display),
+                if is_selected { base_style } else { Style::default().fg(Color::White) }
+            ),
+            Span::styled(
+                format!("{:>6.1} ", process.cpu_percent),
+                if is_selected { base_style } else { Style::default().fg(theme.cpu_color(process.cpu_percent)) }
+            ),
+            Span::styled(
+                format!("{:>6.1}% ", process.memory_percent),
+                if is_selected { base_style } else { Style::default().fg(theme.mem_color(process.memory_percent)) }
+            ),
+            Span::styled(
+                format!("{:>9.1}", size_mb),
+                if is_selected { base_style } else { Style::default().fg(Color::Yellow) }
+            ),
+        ]);
+        lines.push(line);
+    }
+
+    // Footer
+    if popup_state.search_mode {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("Search: ", Style::default().fg(Color::Yellow)),
+            Span::styled(&popup_state.search_text, Style::default().fg(Color::White)),
+            Span::styled("█", Style::default().fg(Color::Cyan)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("ESC to cancel | Enter to apply", Style::default().fg(Color::DarkGray)),
+        ]));
+    } else {
+        lines.push(Line::from(""));
+        let start = if sorted_processes.is_empty() { 0 } else { popup_state.scroll_offset + 1 };
+        let end = (popup_state.scroll_offset + visible_rows).min(sorted_processes.len());
+        let scroll_info = format!("Showing {}-{} of {}", start, end, sorted_processes.len());
+        lines.push(Line::from(vec![
+            Span::styled(scroll_info, Style::default().fg(Color::Cyan)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("↑/↓:select | Enter:details | j/k:scroll | s:sort | r:reverse | c:cmd | /:search | q/ESC:close", Style::default().fg(Color::DarkGray)),
+        ]));
+    }
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
