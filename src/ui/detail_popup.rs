@@ -68,6 +68,11 @@ pub fn render_detail_popup(
                 render_gpu_popup(frame, popup_area, popup_state, gpu_stats, theme);
             }
         }
+        DetailPopupType::GpuProcesses => {
+            if let Some(gpu_stats) = gpu_stats {
+                render_gpu_processes_popup(frame, popup_area, popup_state, gpu_stats, theme);
+            }
+        }
     }
 }
 
@@ -1021,6 +1026,184 @@ fn render_process_list_popup(
         ]));
         lines.push(Line::from(vec![
             Span::styled("↑/↓:select | Enter:details | j/k:scroll | s:sort | r:reverse | c:cmd | /:search | q/ESC:close", Style::default().fg(Color::DarkGray)),
+        ]));
+    }
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
+// GPU Processes Popup - Show all GPU processes from all GPUs
+fn render_gpu_processes_popup(
+    frame: &mut Frame,
+    popup_area: Rect,
+    popup_state: &DetailPopupState,
+    gpu_stats: &[GpuStats],
+    theme: &Theme,
+) {
+    use crate::gpu::GpuProcess;
+
+    // Collect all GPU processes from all GPUs
+    let all_processes: Vec<(&GpuProcess, u32)> = gpu_stats
+        .iter()
+        .flat_map(|gpu| {
+            gpu.processes.iter().map(move |proc| (proc, gpu.gpu_id))
+        })
+        .collect();
+
+    let title = format!(" GPU Processes ({} total) ", all_processes.len());
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD))
+        .style(Style::default().bg(Color::Black));
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if all_processes.is_empty() {
+        let no_procs = Paragraph::new("No GPU processes detected")
+            .style(Style::default().fg(Color::Yellow));
+        frame.render_widget(no_procs, inner);
+        return;
+    }
+
+    let mut lines = Vec::new();
+
+    // Sort indicator
+    lines.push(Line::from(vec![
+        Span::styled("Sort by: ", Style::default().fg(Color::Gray)),
+        Span::styled(
+            format!("{} ", popup_state.sort_field.name()),
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        ),
+        Span::styled(
+            match popup_state.sort_order {
+                SortOrder::Ascending => "↑",
+                SortOrder::Descending => "↓",
+            },
+            Style::default().fg(Color::Cyan)
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // Table header
+    lines.push(Line::from(vec![
+        Span::styled(format!("{:>3} ", "GPU"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>7} ", "PID"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:<25} ", "NAME"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>8} ", "GPU MB"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>7} ", "GPU%"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:<10}", "TYPE"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+    ]));
+
+    // Filter and sort processes
+    let mut filtered_processes: Vec<_> = all_processes
+        .iter()
+        .filter(|(proc, _)| {
+            if popup_state.search_text.is_empty() {
+                true
+            } else {
+                let search_lower = popup_state.search_text.to_lowercase();
+                proc.process_name.to_lowercase().contains(&search_lower)
+                    || proc.pid.to_string().contains(&search_lower)
+            }
+        })
+        .collect();
+
+    // Sort
+    use DetailSortField::*;
+    filtered_processes.sort_by(|a, b| {
+        let cmp = match popup_state.sort_field {
+            Pid => a.0.pid.cmp(&b.0.pid),
+            Name => a.0.process_name.cmp(&b.0.process_name),
+            GpuVram => b.0.gpu_memory_mb.cmp(&a.0.gpu_memory_mb),
+            GpuUtil => b.0.gpu_utilization.cmp(&a.0.gpu_utilization),
+            _ => std::cmp::Ordering::Equal,
+        };
+
+        match popup_state.sort_order {
+            SortOrder::Ascending => cmp.reverse(),
+            SortOrder::Descending => cmp,
+        }
+    });
+
+    // Calculate visible rows
+    let header_lines = 4;
+    let footer_lines = 3;
+    let visible_rows = (inner.height as usize).saturating_sub(header_lines + footer_lines);
+
+    // Apply scroll and render
+    let visible_processes: Vec<_> = filtered_processes
+        .iter()
+        .skip(popup_state.scroll_offset)
+        .take(visible_rows)
+        .collect();
+
+    for (process, gpu_id) in visible_processes {
+        let mem_color = if process.gpu_memory_mb > 1024 {
+            Color::Red
+        } else if process.gpu_memory_mb > 512 {
+            Color::Yellow
+        } else {
+            Color::Green
+        };
+
+        let util_color = if process.gpu_utilization > 80 {
+            Color::Red
+        } else if process.gpu_utilization > 50 {
+            Color::Yellow
+        } else {
+            Color::Green
+        };
+
+        let type_str = match &process.process_type {
+            crate::gpu::GpuProcessType::Graphics => "Graphics",
+            crate::gpu::GpuProcessType::Compute => "Compute",
+            crate::gpu::GpuProcessType::Both => "Both",
+        };
+
+        let type_color = match &process.process_type {
+            crate::gpu::GpuProcessType::Graphics => Color::Blue,
+            crate::gpu::GpuProcessType::Compute => Color::Magenta,
+            crate::gpu::GpuProcessType::Both => Color::Cyan,
+        };
+
+        let name = truncate_str(&process.process_name, 25);
+
+        let line = Line::from(vec![
+            Span::styled(format!("{:>3} ", gpu_id), Style::default().fg(Color::Cyan)),
+            Span::styled(format!("{:>7} ", process.pid), Style::default().fg(Color::White)),
+            Span::styled(format!("{:<25} ", name), Style::default().fg(Color::Gray)),
+            Span::styled(format!("{:>8} ", process.gpu_memory_mb), Style::default().fg(mem_color)),
+            Span::styled(format!("{:>6}% ", process.gpu_utilization), Style::default().fg(util_color)),
+            Span::styled(format!("{:<10}", type_str), Style::default().fg(type_color)),
+        ]);
+        lines.push(line);
+    }
+
+    // Footer
+    if popup_state.search_mode {
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("Search: ", Style::default().fg(Color::Yellow)),
+            Span::styled(&popup_state.search_text, Style::default().fg(Color::White)),
+            Span::styled("█", Style::default().fg(Color::Cyan)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("ESC to cancel | Enter to apply", Style::default().fg(Color::DarkGray)),
+        ]));
+    } else {
+        lines.push(Line::from(""));
+        let start = if filtered_processes.is_empty() { 0 } else { popup_state.scroll_offset + 1 };
+        let end = (popup_state.scroll_offset + visible_rows).min(filtered_processes.len());
+        let scroll_info = format!("Showing {}-{} of {}", start, end, filtered_processes.len());
+        lines.push(Line::from(vec![
+            Span::styled(scroll_info, Style::default().fg(Color::Cyan)),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("j/k:scroll | s:sort | r:reverse | /:search | ESC:close", Style::default().fg(Color::DarkGray)),
         ]));
     }
 

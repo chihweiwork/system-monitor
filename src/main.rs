@@ -17,7 +17,7 @@ use collectors::{
 use gpu::GpuCollector;
 use ui::{
     Ui, CpuWidget, MemoryWidget, ProcessWidget,
-    NetworkWidget, DiskIoWidget, DiskWidget, GpuWidget,
+    NetworkWidget, DiskIoWidget, DiskWidget, GpuWidget, GpuProcessesWidget,
     AppState, ViewMode, SortField, SortOrder,
     MultiPanelLayout,
 };
@@ -66,6 +66,7 @@ async fn run_app() -> Result<()> {
     let mut disk_io_widget = DiskIoWidget::new();
     let mut disk_widget = DiskWidget::new();
     let mut gpu_widget = GpuWidget::new();
+    let mut gpu_processes_widget = GpuProcessesWidget::new();
 
     // Application state
     let mut app_state = AppState::new();
@@ -180,6 +181,14 @@ async fn run_app() -> Result<()> {
                                 app_state.open_detail_popup(ui::DetailPopupType::Gpu, Some('7'));
                             }
                         },
+                        KeyCode::Char('8') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('8') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::GpuProcesses;
+                                app_state.open_detail_popup(ui::DetailPopupType::GpuProcesses, Some('8'));
+                            }
+                        },
 
                         // Detail mode toggle
                         KeyCode::Char('d') if !app_state.filter_active && !app_state.modal_active && !app_state.is_detail_popup_open() => {
@@ -205,6 +214,9 @@ async fn run_app() -> Result<()> {
                                 }
                                 ViewMode::Gpu => {
                                     app_state.open_detail_popup(ui::DetailPopupType::Gpu, None);
+                                }
+                                ViewMode::GpuProcesses => {
+                                    app_state.open_detail_popup(ui::DetailPopupType::GpuProcesses, None);
                                 }
                             }
                         }
@@ -521,6 +533,9 @@ async fn run_app() -> Result<()> {
                     }
                     ViewMode::Gpu => {
                         gpu_widget.render(frame, panel_rect.rect, &gpu_stats_clone, &theme, state.is_detail_mode(ViewMode::Gpu));
+                    }
+                    ViewMode::GpuProcesses => {
+                        gpu_processes_widget.render(frame, panel_rect.rect, &gpu_stats_clone, &theme);
                     }
                 }
             }
@@ -1063,6 +1078,7 @@ fn handle_mouse_event(
                         ViewMode::DiskIo => ui::DetailPopupType::DiskIo,
                         ViewMode::DiskUsage => ui::DetailPopupType::DiskUsage,
                         ViewMode::Gpu => ui::DetailPopupType::Gpu,
+                        ViewMode::GpuProcesses => ui::DetailPopupType::GpuProcesses,
                     };
 
                     // Toggle behavior: close if same key, open otherwise

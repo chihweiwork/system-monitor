@@ -1265,7 +1265,7 @@ impl DiskWidget {
 }
 
 // GPU monitoring widget with multi-vendor support
-use crate::gpu::GpuStats;
+use crate::gpu::{GpuStats, GpuProcess};
 
 pub struct GpuWidget {
     scroll_offset: usize,
@@ -1460,6 +1460,163 @@ impl GpuWidget {
     pub fn scroll_down(&mut self, max_gpus: usize) {
         if self.scroll_offset < max_gpus.saturating_sub(1) {
             self.scroll_offset += 1;
+        }
+    }
+}
+
+pub struct GpuProcessesWidget {
+    scroll_offset: usize,
+}
+
+impl GpuProcessesWidget {
+    pub fn new() -> Self {
+        Self {
+            scroll_offset: 0,
+        }
+    }
+
+    pub fn render(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        gpus: &[GpuStats],
+        theme: &Theme,
+    ) {
+        let block = Block::default()
+            .title(" GPU Processes ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // Collect all GPU processes from all GPUs
+        let all_processes: Vec<(&GpuProcess, u32)> = gpus
+            .iter()
+            .flat_map(|gpu| {
+                gpu.processes.iter().map(move |proc| (proc, gpu.gpu_id))
+            })
+            .collect();
+
+        if all_processes.is_empty() {
+            let text = Paragraph::new("No GPU processes detected");
+            frame.render_widget(text, inner);
+            return;
+        }
+
+        let mut lines = Vec::new();
+
+        // Header
+        let header = Line::from(vec![
+            Span::styled("GPU ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("   PID ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("GPU MB ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("GPU%  ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Type    ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Name", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]);
+        lines.push(header);
+
+        // Calculate visible range
+        let visible_height = (inner.height as usize).saturating_sub(1); // -1 for header
+        let end_index = (self.scroll_offset + visible_height).min(all_processes.len());
+        let visible_processes = &all_processes[self.scroll_offset..end_index];
+
+        // Process rows
+        for (process, gpu_id) in visible_processes {
+            let mem_color = if process.gpu_memory_mb > 1024 {
+                Color::Red
+            } else if process.gpu_memory_mb > 512 {
+                Color::Yellow
+            } else {
+                Color::Green
+            };
+
+            let util_color = if process.gpu_utilization > 80 {
+                Color::Red
+            } else if process.gpu_utilization > 50 {
+                Color::Yellow
+            } else {
+                Color::Green
+            };
+
+            let type_str = match &process.process_type {
+                crate::gpu::GpuProcessType::Graphics => "Graphics",
+                crate::gpu::GpuProcessType::Compute => "Compute ",
+                crate::gpu::GpuProcessType::Both => "Both    ",
+            };
+
+            let type_color = match &process.process_type {
+                crate::gpu::GpuProcessType::Graphics => Color::Blue,
+                crate::gpu::GpuProcessType::Compute => Color::Magenta,
+                crate::gpu::GpuProcessType::Both => Color::Cyan,
+            };
+
+            // Calculate available width for process name
+            // GPU(4) + PID(9) + GPU MB(9) + GPU%(8) + Type(10) + separators(~10) = 50
+            let name_width = inner.width.saturating_sub(50) as usize;
+            let display_name = if process.process_name.len() > name_width {
+                let truncate_at = name_width.saturating_sub(3);
+                let mut end = truncate_at;
+                while end > 0 && !process.process_name.is_char_boundary(end) {
+                    end -= 1;
+                }
+                format!("{}...", &process.process_name[..end])
+            } else {
+                process.process_name.clone()
+            };
+
+            let line = Line::from(vec![
+                Span::styled(format!("{:>3} ", gpu_id), Style::default().fg(Color::Cyan)),
+                Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{:>7} ", process.pid), Style::default().fg(Color::White)),
+                Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{:>6} ", process.gpu_memory_mb), Style::default().fg(mem_color)),
+                Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{:>4}% ", process.gpu_utilization), Style::default().fg(util_color)),
+                Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{} ", type_str), Style::default().fg(type_color)),
+                Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+                Span::styled(display_name, Style::default().fg(Color::Gray)),
+            ]);
+            lines.push(line);
+        }
+
+        let paragraph = Paragraph::new(lines);
+        frame.render_widget(paragraph, inner);
+    }
+
+    pub fn scroll_up(&mut self, count: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(count);
+    }
+
+    pub fn scroll_down(&mut self, count: usize, max: usize) {
+        if max > 0 {
+            let max_scroll = max.saturating_sub(1);
+            self.scroll_offset = (self.scroll_offset + count).min(max_scroll);
+        }
+    }
+
+    pub fn page_up(&mut self, page_size: usize) {
+        self.scroll_up(page_size);
+    }
+
+    pub fn page_down(&mut self, page_size: usize, max: usize) {
+        self.scroll_down(page_size, max);
+    }
+
+    pub fn home(&mut self) {
+        self.scroll_offset = 0;
+    }
+
+    pub fn end(&mut self, max: usize) {
+        if max > 0 {
+            self.scroll_offset = max.saturating_sub(1);
         }
     }
 }

@@ -10,6 +10,7 @@ pub enum ViewMode {
     DiskIo,
     DiskUsage,
     Gpu,
+    GpuProcesses,
 }
 
 impl ViewMode {
@@ -22,6 +23,7 @@ impl ViewMode {
             4 => Some(ViewMode::DiskIo),
             5 => Some(ViewMode::DiskUsage),
             6 => Some(ViewMode::Gpu),
+            7 => Some(ViewMode::GpuProcesses),
             _ => None,
         }
     }
@@ -35,6 +37,7 @@ impl ViewMode {
             ViewMode::DiskIo => 4,
             ViewMode::DiskUsage => 5,
             ViewMode::Gpu => 6,
+            ViewMode::GpuProcesses => 7,
         }
     }
 
@@ -47,6 +50,7 @@ impl ViewMode {
             ViewMode::DiskIo => "Disk I/O",
             ViewMode::DiskUsage => "Disk Usage",
             ViewMode::Gpu => "GPU",
+            ViewMode::GpuProcesses => "GPU Processes",
         }
     }
 
@@ -58,19 +62,21 @@ impl ViewMode {
             ViewMode::Network => ViewMode::DiskIo,
             ViewMode::DiskIo => ViewMode::DiskUsage,
             ViewMode::DiskUsage => ViewMode::Gpu,
-            ViewMode::Gpu => ViewMode::Cpu,
+            ViewMode::Gpu => ViewMode::GpuProcesses,
+            ViewMode::GpuProcesses => ViewMode::Cpu,
         }
     }
 
     pub fn prev(&self) -> Self {
         match self {
-            ViewMode::Cpu => ViewMode::Gpu,
+            ViewMode::Cpu => ViewMode::GpuProcesses,
             ViewMode::Memory => ViewMode::Cpu,
             ViewMode::Processes => ViewMode::Memory,
             ViewMode::Network => ViewMode::Processes,
             ViewMode::DiskIo => ViewMode::Network,
             ViewMode::DiskUsage => ViewMode::DiskIo,
             ViewMode::Gpu => ViewMode::DiskUsage,
+            ViewMode::GpuProcesses => ViewMode::Gpu,
         }
     }
 }
@@ -233,6 +239,13 @@ impl DetailSortField {
                 GpuPower => GpuId,
                 _ => GpuId,
             },
+            DetailPopupType::GpuProcesses => match self {
+                Pid => Name,
+                Name => GpuVram,
+                GpuVram => GpuUtil,
+                GpuUtil => Pid,
+                _ => Pid,
+            },
         }
     }
 
@@ -277,6 +290,7 @@ pub enum DetailPopupType {
     Network,
     DiskUsage,
     Gpu,
+    GpuProcesses,
 }
 
 /// State for detail popup window
@@ -305,6 +319,7 @@ impl DetailPopupState {
                 DetailPopupType::Network => DetailSortField::Cpu,
                 DetailPopupType::DiskUsage => DetailSortField::DiskUsage,
                 DetailPopupType::Gpu => DetailSortField::GpuUtil,
+                DetailPopupType::GpuProcesses => DetailSortField::GpuVram,
             },
             sort_order: SortOrder::Descending,
             show_full_command: false,
@@ -394,6 +409,7 @@ impl AppState {
         visible_panels.insert(ViewMode::DiskIo);
         visible_panels.insert(ViewMode::DiskUsage);
         visible_panels.insert(ViewMode::Gpu);
+        visible_panels.insert(ViewMode::GpuProcesses);
 
         Self {
             visible_panels,

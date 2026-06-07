@@ -21,7 +21,7 @@ use std::io;
 use std::time::Duration;
 
 pub use theme::Theme;
-pub use widgets::{CpuWidget, MemoryWidget, ProcessWidget, NetworkWidget, DiskIoWidget, DiskWidget, GpuWidget};
+pub use widgets::{CpuWidget, MemoryWidget, ProcessWidget, NetworkWidget, DiskIoWidget, DiskWidget, GpuWidget, GpuProcessesWidget};
 pub use layout::{MultiPanelLayout, PanelRect};
 pub use state::{AppState, ViewMode, SortField, SortOrder, DetailSortField, DetailPopupType, DetailPopupState};
 pub use detail_popup::render_detail_popup;
