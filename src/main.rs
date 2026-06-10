@@ -358,6 +358,18 @@ async fn run_app() -> Result<()> {
             disk_stats = disk_collector.collect().await?;
             gpu_stats = gpu_collector.collect().await.unwrap_or_default();
             cpu_widget.update(&cpu_stats);
+
+            // Merge GPU process data into ProcessStats
+            for gpu_stat in &gpu_stats {
+                for gpu_proc in &gpu_stat.processes {
+                    if let Some(proc) = processes.iter_mut().find(|p| p.pid == gpu_proc.pid) {
+                        proc.gpu_memory_mb += gpu_proc.gpu_memory_mb;
+                        proc.gpu_utilization = proc.gpu_utilization.max(gpu_proc.gpu_utilization);
+                        proc.gpu_type = Some(gpu_proc.process_type.clone());
+                    }
+                }
+            }
+
             last_update = now;
         }
 

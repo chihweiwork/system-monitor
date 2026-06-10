@@ -511,6 +511,10 @@ impl ProcessWidget {
             Span::styled("│ ", Style::default().fg(Color::DarkGray)),
             Span::styled("MEM%  ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("GPU MB ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("GPU%  ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("│ ", Style::default().fg(Color::DarkGray)),
             Span::styled(header_name, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
         ]);
 
@@ -557,9 +561,29 @@ impl ProcessWidget {
                 Color::Cyan
             };
 
+            let gpu_mem_color = if process.gpu_memory_mb > 2048 {
+                Color::Red
+            } else if process.gpu_memory_mb > 512 {
+                Color::Yellow
+            } else if process.gpu_memory_mb > 0 {
+                Color::Green
+            } else {
+                Color::DarkGray
+            };
+
+            let gpu_util_color = if process.gpu_utilization > 80 {
+                Color::Red
+            } else if process.gpu_utilization > 50 {
+                Color::Yellow
+            } else if process.gpu_utilization > 0 {
+                Color::Green
+            } else {
+                Color::DarkGray
+            };
+
             // Calculate available width for name/command column
-            // USER(9) + PID(9) + CPU(8) + MEM(8) + separators(~8) = 42
-            let name_width = list_area.width.saturating_sub(42) as usize;
+            // USER(9) + PID(9) + CPU(8) + MEM(8) + GPU MB(9) + GPU%(8) + separators(~12) = 63
+            let name_width = list_area.width.saturating_sub(63) as usize;
 
             // Choose display text based on mode and truncate if needed
             let display_text = if show_full_command {
@@ -609,6 +633,10 @@ impl ProcessWidget {
                 Span::styled(format!("{:>5.1} ", process.cpu_percent), style.fg(cpu_color)),
                 Span::styled("│ ", style.fg(Color::DarkGray)),
                 Span::styled(format!("{:>5.1} ", process.memory_percent), style.fg(mem_color)),
+                Span::styled("│ ", style.fg(Color::DarkGray)),
+                Span::styled(format!("{:>6} ", process.gpu_memory_mb), style.fg(gpu_mem_color)),
+                Span::styled("│ ", style.fg(Color::DarkGray)),
+                Span::styled(format!("{:>4}% ", process.gpu_utilization), style.fg(gpu_util_color)),
                 Span::styled("│ ", style.fg(Color::DarkGray)),
                 Span::styled(
                     display_text,
