@@ -87,6 +87,8 @@ pub enum SortField {
     Name,
     Cpu,
     Memory,
+    GpuMemory,
+    GpuUtilization,
 }
 
 impl SortField {
@@ -95,16 +97,20 @@ impl SortField {
             SortField::Pid => SortField::Name,
             SortField::Name => SortField::Cpu,
             SortField::Cpu => SortField::Memory,
-            SortField::Memory => SortField::Pid,
+            SortField::Memory => SortField::GpuMemory,
+            SortField::GpuMemory => SortField::GpuUtilization,
+            SortField::GpuUtilization => SortField::Pid,
         }
     }
 
     pub fn prev(&self) -> Self {
         match self {
-            SortField::Pid => SortField::Memory,
+            SortField::Pid => SortField::GpuUtilization,
             SortField::Name => SortField::Pid,
             SortField::Cpu => SortField::Name,
             SortField::Memory => SortField::Cpu,
+            SortField::GpuMemory => SortField::Memory,
+            SortField::GpuUtilization => SortField::GpuMemory,
         }
     }
 
@@ -114,6 +120,8 @@ impl SortField {
             SortField::Name => "Name",
             SortField::Cpu => "CPU%",
             SortField::Memory => "MEM%",
+            SortField::GpuMemory => "GPU MB",
+            SortField::GpuUtilization => "GPU%",
         }
     }
 }

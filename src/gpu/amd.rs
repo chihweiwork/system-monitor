@@ -2,6 +2,7 @@ use super::{GpuStats, read_sysfs_string, read_sysfs_u64};
 use crate::core::{Result, Error};
 use std::path::{Path, PathBuf};
 use std::fs;
+use super::amd_process::collect_amd_processes;
 
 pub struct AmdBackend {
     devices: Vec<PathBuf>,
@@ -116,6 +117,9 @@ impl AmdBackend {
             }
         }
 
+        // Collect GPU processes
+        let processes = collect_amd_processes(device_path);
+
         Ok(GpuStats {
             name,
             vendor: "AMD".to_string(),
@@ -124,7 +128,7 @@ impl AmdBackend {
             memory_total_mb,
             temperature_c,
             power_watts,
-            processes: Vec::new(),
+            processes,
             gpu_id,
         })
     }

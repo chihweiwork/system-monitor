@@ -2,6 +2,7 @@ use super::{GpuStats, read_sysfs_string, read_sysfs_u64};
 use crate::core::{Result, Error};
 use std::path::{Path, PathBuf};
 use std::fs;
+use super::intel_process::collect_intel_processes;
 
 pub struct IntelBackend {
     devices: Vec<PathBuf>,
@@ -113,6 +114,9 @@ impl IntelBackend {
             }
         }
 
+        // Collect GPU processes
+        let processes = collect_intel_processes(device_path);
+
         Ok(GpuStats {
             name,
             vendor: "Intel".to_string(),
@@ -121,7 +125,7 @@ impl IntelBackend {
             memory_total_mb,
             temperature_c,
             power_watts,
-            processes: Vec::new(),
+            processes,
             gpu_id,
         })
     }

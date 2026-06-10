@@ -97,9 +97,37 @@ impl NvidiaBackend {
             // Get process list
             let mut processes = Vec::new();
 
-            // Graphics processes (skip - processes info not available without NVML v2)
-            // NVML process API requires v2 which may not be available
-            // For now, we collect basic GPU stats without per-process info
+            // Try to get graphics processes
+            if let Ok(graphics_procs) = device.running_graphics_processes() {
+                for proc_info in graphics_procs {
+                    processes.push(GpuProcess {
+                        pid: proc_info.pid,
+                        process_name: get_process_name(proc_info.pid),
+                        gpu_memory_mb: proc_info.used_gpu_memory as u64 / (1024 * 1024),
+                        gpu_utilization: 0, // NVML doesn't provide per-process utilization
+                        process_type: GpuProcessType::Graphics,
+                    });
+                }
+            }
+
+            // Try to get compute processes
+            if let Ok(compute_procs) = device.running_compute_processes() {
+                for proc_info in compute_procs {
+                    // Check if process already exists (could be both graphics and compute)
+                    if let Some(existing) = processes.iter_mut().find(|p| p.pid == proc_info.pid) {
+                        existing.process_type = GpuProcessType::Both;
+                        existing.gpu_memory_mb += proc_info.used_gpu_memory as u64 / (1024 * 1024);
+                    } else {
+                        processes.push(GpuProcess {
+                            pid: proc_info.pid,
+                            process_name: get_process_name(proc_info.pid),
+                            gpu_memory_mb: proc_info.used_gpu_memory as u64 / (1024 * 1024),
+                            gpu_utilization: 0,
+                            process_type: GpuProcessType::Compute,
+                        });
+                    }
+                }
+            }
 
             stats.push(GpuStats {
                 name,

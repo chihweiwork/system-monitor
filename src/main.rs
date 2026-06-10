@@ -814,6 +814,8 @@ fn sort_processes(processes: &mut [ProcessStats], field: SortField, order: SortO
             SortField::Name => a.name.cmp(&b.name),
             SortField::Cpu => a.cpu_percent.partial_cmp(&b.cpu_percent).unwrap_or(std::cmp::Ordering::Equal),
             SortField::Memory => a.memory_percent.partial_cmp(&b.memory_percent).unwrap_or(std::cmp::Ordering::Equal),
+            SortField::GpuMemory => a.gpu_memory_mb.cmp(&b.gpu_memory_mb),
+            SortField::GpuUtilization => a.gpu_utilization.cmp(&b.gpu_utilization),
         };
 
         match order {
@@ -832,6 +834,7 @@ fn calculate_title_bar_tabs(area: Rect) -> Vec<TitleBarTab> {
         (ViewMode::DiskIo, '5', "5:I/O"),
         (ViewMode::DiskUsage, '6', "6:Disk"),
         (ViewMode::Gpu, '7', "7:GPU"),
+        (ViewMode::GpuProcesses, '8', "8:GPUProc"),
     ];
 
     let mut result = Vec::new();

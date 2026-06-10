@@ -4,6 +4,8 @@
 pub mod nvidia;
 pub mod amd;
 pub mod intel;
+mod amd_process;
+mod intel_process;
 
 use crate::core::{Result, Error};
 use crate::collectors::Collector;
