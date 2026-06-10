@@ -5,7 +5,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](https://www.kernel.org/)
 
-A unified, modern system monitoring tool written in Rust, integrating the best features from **btop**, **atop**, **iotop**, **nvtop**, and **iftop**.
+A unified, modern system monitoring tool written in Rust, integrating the best features from **btop**, **atop**, **iotop**, **nvtop**, and **iftop**. Now with **full GPU monitoring** support for NVIDIA, AMD, and Intel GPUs!
 
 ---
 
@@ -18,7 +18,11 @@ A unified, modern system monitoring tool written in Rust, integrating the best f
 - **Network**: Network activity tracking by process
 - **Disk I/O**: Real-time I/O read/write statistics per process
 - **Disk Usage**: Filesystem usage for all mount points
-- **GPU**: Multi-vendor GPU monitoring (NVIDIA, AMD, Intel)
+- **GPU Monitoring**: Multi-vendor GPU support with process tracking
+  - NVIDIA: Full NVML integration for accurate metrics
+  - AMD & Intel: Sysfs-based monitoring
+  - Per-process GPU memory and utilization
+  - GPU columns in process detail view
 
 ### 🎨 Modern TUI Interface
 - **Unified Popup Windows**: Press `d` on any panel for detailed 80% screen view
@@ -44,30 +48,30 @@ Every panel supports detailed popup views with:
 
 | Your System | Version to Download | Works On |
 |-------------|---------------------|----------|
-| 🔴 **Red Hat / CentOS / Rocky** | [**Static Build**](release/v0.1.0/redhat/) | RHEL 6/7/8/9, CentOS, Rocky, AlmaLinux (all versions) |
-| 🔵 **Ubuntu / Debian** | [**Dynamic Build**](release/v0.1.0/debian/) | Ubuntu 22.04+, Debian 12+, RHEL 9+ |
-| 🟢 **Not Sure?** | [**Static Build**](release/v0.1.0/redhat/) | Works everywhere (recommended) |
+| 🔴 **Red Hat / CentOS / Rocky** | [**Static Build**](release/v0.2.0/redhat/) | RHEL 6/7/8/9, CentOS, Rocky, AlmaLinux (all versions) |
+| 🔵 **Ubuntu / Debian** | [**Dynamic Build**](release/v0.2.0/debian/) | Ubuntu 22.04+, Debian 12+, RHEL 9+ |
+| 🟢 **Not Sure?** | [**Static Build**](release/v0.2.0/redhat/) | Works everywhere (recommended) |
 
 #### Quick Install
 
 ```bash
 # For Red Hat / CentOS / Rocky / any Linux (static build)
-wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64-static.tar.gz
-tar -xzf system-monitor-v0.1.0-linux-x86_64-static.tar.gz
-sudo mv system-monitor /usr/local/bin/
+wget https://github.com/chihweiwork/system-monitor/releases/download/v0.2.0/system-monitor-v0.2.0-rhel-x86_64-static
+chmod +x system-monitor-v0.2.0-rhel-x86_64-static
+sudo mv system-monitor-v0.2.0-rhel-x86_64-static /usr/local/bin/system-monitor
 system-monitor
 
 # For Ubuntu 22.04+ / Debian 12+ (dynamic build, smaller)
-wget https://github.com/chihweiwork/system-monitor/releases/download/v0.1.0/system-monitor-v0.1.0-linux-x86_64.tar.gz
-tar -xzf system-monitor-v0.1.0-linux-x86_64.tar.gz
-sudo mv system-monitor /usr/local/bin/
+wget https://github.com/chihweiwork/system-monitor/releases/download/v0.2.0/system-monitor-v0.2.0-ubuntu-x86_64
+chmod +x system-monitor-v0.2.0-ubuntu-x86_64
+sudo mv system-monitor-v0.2.0-ubuntu-x86_64 /usr/local/bin/system-monitor
 system-monitor
 ```
 
 📖 **Detailed installation guides** (with checksums, troubleshooting, and multiple install methods):
-- [Red Hat / CentOS Installation Guide](release/v0.1.0/redhat/README.md)
-- [Ubuntu / Debian Installation Guide](release/v0.1.0/debian/README.md)
-- [Version Comparison & Selection Guide](release/v0.1.0/README.md)
+- [Red Hat / CentOS Installation Guide](release/v0.2.0/redhat/README.md)
+- [Ubuntu / Debian Installation Guide](release/v0.2.0/debian/README.md)
+- [Version Comparison & Selection Guide](release/v0.2.0/README.md)
 
 ### Build from Source
 
@@ -157,8 +161,13 @@ system-monitor
 
 ### 3. Processes Panel
 - **Main View**: Full process list with filtering
-- **Modal View**: Detailed process information (press Enter)
-- **Features**: Filter by name, sort by CPU/Memory/PID/Name
+- **Popup View**: Detailed process information with GPU columns
+  - PID, User, Process Name
+  - CPU%, Memory%, Memory Size (MB)
+  - **GPU Memory (MB)**, **GPU Utilization (%)**
+- **Features**: Filter by name, sort by CPU/Memory/GPU/PID/Name
+- **GPU Sorting**: Sort by GPU memory or GPU utilization
+- **Color-coded GPU usage**: Red (high), Yellow (medium), Green (low)
 
 ### 4. Network Monitor
 - **Main View**: Network activity summary
@@ -179,12 +188,19 @@ system-monitor
 - **Sort Options**: Mount Point, Usage%, Used GB, Available GB, FS Type
 
 ### 7. GPU Monitor
-- **Main View**: GPU utilization summary
-- **Popup View**: Detailed GPU statistics:
-  - GPU ID, Name, Vendor
+- **Main View**: GPU utilization summary for all detected GPUs
+- **GPU Detail Popup**: Per-GPU statistics:
+  - GPU ID, Name, Vendor (NVIDIA/AMD/Intel)
   - Utilization%, VRAM Usage, Temperature (°C), Power (W)
+- **GPU Processes Popup**: See which processes use GPU
+  - PID, Process Name, GPU Memory, GPU Utilization
+  - Process Type: Graphics, Compute, or Both
+- **Multi-vendor Support**:
+  - **NVIDIA**: Full NVML integration (accurate metrics)
+  - **AMD**: Sysfs monitoring (usage, memory, processes)
+  - **Intel**: Sysfs monitoring (usage, memory)
 - **Sort Options**: GPU ID, Util%, VRAM%, Temp, Power
-- **Note**: Requires vendor-specific drivers (NVIDIA/AMD/Intel)
+- **Requirements**: NVIDIA drivers for NVIDIA GPUs (libnvidia-ml.so)
 
 ---
 
@@ -219,9 +235,10 @@ system-monitor/
 │       ├── config.rs        # Configuration
 │       └── types.rs         # Common types
 ├── release/                 # Pre-built binaries
-│   └── v0.1.0/
-│       ├── redhat/          # Static builds (RHEL, CentOS, etc.)
-│       └── debian/          # Dynamic builds (Ubuntu, Debian, etc.)
+│   ├── v0.2.0/              # Latest release (GPU monitoring)
+│   │   ├── redhat/          # Static builds (RHEL, CentOS, etc.)
+│   │   └── debian/          # Dynamic builds (Ubuntu, Debian, etc.)
+│   └── v0.1.0/              # Previous release
 ├── atop/                    # Reference: atop source code
 ├── btop/                    # Reference: btop source code
 ├── iotop/                   # Reference: iotop source code
@@ -237,7 +254,8 @@ system-monitor/
 - **TUI Framework**: [Ratatui](https://github.com/ratatui-org/ratatui)
 - **Terminal Backend**: [Crossterm](https://github.com/crossterm-rs/crossterm)
 - **Data Sources**: Linux `/proc` filesystem, `statvfs` syscall
-- **GPU APIs**: NVML (NVIDIA), ROCm (AMD), Intel GPU tools
+- **GPU APIs**: NVML (NVIDIA), Sysfs (AMD/Intel)
+- **GPU Libraries**: nvml-wrapper 0.10 (optional, enabled by default)
 
 ### Data Collection
 
@@ -332,10 +350,11 @@ All reference codebases are indexed with GitNexus for code exploration and learn
 ## 🐛 Known Limitations
 
 - **Linux Only**: Currently supports Linux only (cross-platform support planned)
-- **GPU Support**: Requires vendor-specific drivers and libraries
-  - NVIDIA: `libnvidia-ml.so` (NVML)
-  - AMD: ROCm runtime
-  - Intel: Intel GPU tools
+- **GPU Support**: 
+  - NVIDIA: Requires NVIDIA drivers with `libnvidia-ml.so` (included with driver)
+  - AMD: Works with open-source `amdgpu` driver (no extra dependencies)
+  - Intel: Works with standard Intel GPU drivers (no extra dependencies)
+  - Per-process GPU utilization not available for AMD/Intel (driver limitation)
 - **Network Process Tracking**: Uses CPU usage as proxy metric (kernel limitations)
 - **Root Required**: Some I/O statistics require root or `/proc` read permissions
 
@@ -345,7 +364,7 @@ All reference codebases are indexed with GitNexus for code exploration and learn
 
 - [ ] macOS support (via `sysctl`, `top`, `vm_stat`)
 - [ ] FreeBSD/OpenBSD support
-- [ ] Process-level GPU usage tracking
+- [x] Process-level GPU usage tracking (NVIDIA: full support, AMD/Intel: memory only)
 - [ ] Historical data logging (inspired by atop)
 - [ ] Configuration file support
 - [ ] Custom color themes
