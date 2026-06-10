@@ -100,10 +100,14 @@ impl NvidiaBackend {
             // Try to get graphics processes
             if let Ok(graphics_procs) = device.running_graphics_processes() {
                 for proc_info in graphics_procs {
+                    let memory_mb = match proc_info.used_gpu_memory {
+                        nvml_wrapper::enums::device::UsedGpuMemory::Used(bytes) => bytes / (1024 * 1024),
+                        nvml_wrapper::enums::device::UsedGpuMemory::Unavailable => 0,
+                    };
                     processes.push(GpuProcess {
                         pid: proc_info.pid,
                         process_name: get_process_name(proc_info.pid),
-                        gpu_memory_mb: proc_info.used_gpu_memory as u64 / (1024 * 1024),
+                        gpu_memory_mb: memory_mb,
                         gpu_utilization: 0, // NVML doesn't provide per-process utilization
                         process_type: GpuProcessType::Graphics,
                     });
@@ -113,15 +117,19 @@ impl NvidiaBackend {
             // Try to get compute processes
             if let Ok(compute_procs) = device.running_compute_processes() {
                 for proc_info in compute_procs {
+                    let memory_mb = match proc_info.used_gpu_memory {
+                        nvml_wrapper::enums::device::UsedGpuMemory::Used(bytes) => bytes / (1024 * 1024),
+                        nvml_wrapper::enums::device::UsedGpuMemory::Unavailable => 0,
+                    };
                     // Check if process already exists (could be both graphics and compute)
                     if let Some(existing) = processes.iter_mut().find(|p| p.pid == proc_info.pid) {
                         existing.process_type = GpuProcessType::Both;
-                        existing.gpu_memory_mb += proc_info.used_gpu_memory as u64 / (1024 * 1024);
+                        existing.gpu_memory_mb += memory_mb;
                     } else {
                         processes.push(GpuProcess {
                             pid: proc_info.pid,
                             process_name: get_process_name(proc_info.pid),
-                            gpu_memory_mb: proc_info.used_gpu_memory as u64 / (1024 * 1024),
+                            gpu_memory_mb: memory_mb,
                             gpu_utilization: 0,
                             process_type: GpuProcessType::Compute,
                         });

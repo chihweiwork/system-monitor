@@ -180,6 +180,10 @@ pub enum DetailSortField {
     GpuVram,
     GpuTemp,
     GpuPower,
+
+    // Process GPU fields
+    GpuMemory,
+    GpuUtilization,
 }
 
 impl DetailSortField {
@@ -210,7 +214,9 @@ impl DetailSortField {
                 Name => Cpu,
                 Cpu => Memory,
                 Memory => MemorySize,
-                MemorySize => Pid,
+                MemorySize => GpuMemory,
+                GpuMemory => GpuUtilization,
+                GpuUtilization => Pid,
                 _ => Pid,
             },
             DetailPopupType::DiskIo => match self {
@@ -284,6 +290,8 @@ impl DetailSortField {
             DetailSortField::GpuVram => "VRAM%",
             DetailSortField::GpuTemp => "Temperature°C",
             DetailSortField::GpuPower => "Power W",
+            DetailSortField::GpuMemory => "GPU MB",
+            DetailSortField::GpuUtilization => "GPU%",
         }
     }
 }
@@ -322,7 +330,7 @@ impl DetailPopupState {
             sort_field: match popup_type {
                 DetailPopupType::Cpu => DetailSortField::CpuTotal,
                 DetailPopupType::Memory => DetailSortField::Memory,
-                DetailPopupType::Process => DetailSortField::Cpu,
+                DetailPopupType::Process => DetailSortField::GpuMemory,
                 DetailPopupType::DiskIo => DetailSortField::IoTotal,
                 DetailPopupType::Network => DetailSortField::Cpu,
                 DetailPopupType::DiskUsage => DetailSortField::DiskUsage,

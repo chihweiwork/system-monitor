@@ -17,7 +17,7 @@ libc = "0.2"
 nvml-wrapper = { version = "0.10", optional = true }
 
 [features]
-default = []
+default = ["nvidia"]
 nvidia = ["nvml-wrapper"]
 
 [dev-dependencies]

@@ -402,6 +402,8 @@ fn sort_processes(
                 let b_total = b.io_read_rate + b.io_write_rate;
                 b_total.partial_cmp(&a_total).unwrap_or(std::cmp::Ordering::Equal)
             }
+            GpuMemory => b.gpu_memory_mb.cmp(&a.gpu_memory_mb),
+            GpuUtilization => b.gpu_utilization.cmp(&a.gpu_utilization),
             _ => std::cmp::Ordering::Equal,
         };
 
@@ -924,10 +926,12 @@ fn render_process_list_popup(
     let header = Line::from(vec![
         Span::styled(format!("{:>7} ", "PID"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
         Span::styled(format!("{:<10} ", "USER"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("{:<30} ", "NAME"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:<22} ", "NAME"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
         Span::styled(format!("{:>6} ", "CPU%"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
         Span::styled(format!("{:>7} ", "MEM%"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
-        Span::styled(format!("{:>10}", "SIZE MB"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>9} ", "SIZE MB"), Style::default().fg(Color::Gray).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>8} ", "GPU MB"), Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{:>6}", "GPU%"), Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
     ]);
     lines.push(header);
 
@@ -955,20 +959,41 @@ fn render_process_list_popup(
                 format!("[{}]", process.name)
             };
 
-            if cmdline.len() > 30 {
-                format!("{}...", &cmdline[..27])
+            if cmdline.len() > 22 {
+                format!("{}...", &cmdline[..19])
             } else {
                 cmdline
             }
         } else {
             // Show process name
-            if process.name.len() > 30 {
-                format!("{}...", &process.name[..27])
+            if process.name.len() > 22 {
+                format!("{}...", &process.name[..19])
             } else {
                 process.name.clone()
             }
         };
         let size_mb = process.memory_kb as f64 / 1024.0;
+
+        // GPU info colors
+        let gpu_mem_color = if process.gpu_memory_mb > 2048 {
+            Color::Red
+        } else if process.gpu_memory_mb > 512 {
+            Color::Yellow
+        } else if process.gpu_memory_mb > 0 {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
+
+        let gpu_util_color = if process.gpu_utilization > 80 {
+            Color::Red
+        } else if process.gpu_utilization > 50 {
+            Color::Yellow
+        } else if process.gpu_utilization > 0 {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
 
         let base_style = if is_selected {
             Style::default().fg(Color::Black).bg(Color::Cyan)
@@ -986,7 +1011,7 @@ fn render_process_list_popup(
                 if is_selected { base_style } else { Style::default().fg(Color::Gray) }
             ),
             Span::styled(
-                format!("{:<30} ", name_for_display),
+                format!("{:<22} ", name_for_display),
                 if is_selected { base_style } else { Style::default().fg(Color::White) }
             ),
             Span::styled(
@@ -998,8 +1023,16 @@ fn render_process_list_popup(
                 if is_selected { base_style } else { Style::default().fg(theme.mem_color(process.memory_percent)) }
             ),
             Span::styled(
-                format!("{:>9.1}", size_mb),
+                format!("{:>8.1} ", size_mb),
                 if is_selected { base_style } else { Style::default().fg(Color::Yellow) }
+            ),
+            Span::styled(
+                format!("{:>8} ", if process.gpu_memory_mb > 0 { process.gpu_memory_mb.to_string() } else { "-".to_string() }),
+                if is_selected { base_style } else { Style::default().fg(gpu_mem_color) }
+            ),
+            Span::styled(
+                format!("{:>5}", if process.gpu_utilization > 0 { format!("{}%", process.gpu_utilization) } else { "-".to_string() }),
+                if is_selected { base_style } else { Style::default().fg(gpu_util_color) }
             ),
         ]);
         lines.push(line);
