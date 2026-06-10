@@ -3,6 +3,7 @@
 This directory contains all release builds organized by version.
 
 ## Available Versions
+- [v0.2.0](v0.2.0/) - GPU Monitoring Enhancements (2026-06-10) **← Latest**
 - [v0.1.0](v0.1.0/) - Initial Release (2026-06-01)
 
 ## Build Types
