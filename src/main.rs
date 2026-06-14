@@ -106,7 +106,85 @@ async fn run_app() -> Result<()> {
                         continue;
                     }
 
-                    // Then handle detail popup events
+                    // Handle number key toggles BEFORE detail popup input handling
+                    // This allows number keys to toggle popups even when a popup is already open
+                    match key_event.code {
+                        KeyCode::Char('1') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('1') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Cpu;
+                                app_state.open_detail_popup(ui::DetailPopupType::Cpu, Some('1'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('2') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('2') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Memory;
+                                app_state.open_detail_popup(ui::DetailPopupType::Memory, Some('2'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('3') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('3') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Processes;
+                                app_state.open_detail_popup(ui::DetailPopupType::Process, Some('3'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('4') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('4') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Network;
+                                app_state.open_detail_popup(ui::DetailPopupType::Network, Some('4'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('5') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('5') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::DiskIo;
+                                app_state.open_detail_popup(ui::DetailPopupType::DiskIo, Some('5'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('6') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('6') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::DiskUsage;
+                                app_state.open_detail_popup(ui::DetailPopupType::DiskUsage, Some('6'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('7') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('7') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::Gpu;
+                                app_state.open_detail_popup(ui::DetailPopupType::Gpu, Some('7'));
+                            }
+                            continue;
+                        },
+                        KeyCode::Char('8') if !app_state.filter_active => {
+                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('8') {
+                                app_state.close_detail_popup();
+                            } else {
+                                app_state.active_panel = ViewMode::GpuProcesses;
+                                app_state.open_detail_popup(ui::DetailPopupType::GpuProcesses, Some('8'));
+                            }
+                            continue;
+                        },
+                        _ => {}
+                    }
+
+                    // Then handle detail popup events (for navigation, search, sort, etc.)
                     if app_state.is_detail_popup_open() {
                         // Use approximate values - exact count will be handled in main loop
                         handle_detail_popup_input(key_event.code, &mut app_state, processes.len(), 20);
@@ -123,72 +201,6 @@ async fn run_app() -> Result<()> {
                         // Panel toggling
                         KeyCode::Tab if !app_state.filter_active => app_state.next_view(),
                         KeyCode::BackTab if !app_state.filter_active => app_state.prev_view(),
-
-                        // Number keys toggle detail popup for corresponding panel
-                        KeyCode::Char('1') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('1') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::Cpu;
-                                app_state.open_detail_popup(ui::DetailPopupType::Cpu, Some('1'));
-                            }
-                        },
-                        KeyCode::Char('2') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('2') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::Memory;
-                                app_state.open_detail_popup(ui::DetailPopupType::Memory, Some('2'));
-                            }
-                        },
-                        KeyCode::Char('3') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('3') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::Processes;
-                                app_state.open_detail_popup(ui::DetailPopupType::Process, Some('3'));
-                            }
-                        },
-                        KeyCode::Char('4') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('4') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::Network;
-                                app_state.open_detail_popup(ui::DetailPopupType::Network, Some('4'));
-                            }
-                        },
-                        KeyCode::Char('5') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('5') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::DiskIo;
-                                app_state.open_detail_popup(ui::DetailPopupType::DiskIo, Some('5'));
-                            }
-                        },
-                        KeyCode::Char('6') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('6') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::DiskUsage;
-                                app_state.open_detail_popup(ui::DetailPopupType::DiskUsage, Some('6'));
-                            }
-                        },
-                        KeyCode::Char('7') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('7') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::Gpu;
-                                app_state.open_detail_popup(ui::DetailPopupType::Gpu, Some('7'));
-                            }
-                        },
-                        KeyCode::Char('8') if !app_state.filter_active => {
-                            if app_state.is_detail_popup_open() && app_state.opened_by_key == Some('8') {
-                                app_state.close_detail_popup();
-                            } else {
-                                app_state.active_panel = ViewMode::GpuProcesses;
-                                app_state.open_detail_popup(ui::DetailPopupType::GpuProcesses, Some('8'));
-                            }
-                        },
 
                         // Detail mode toggle
                         KeyCode::Char('d') if !app_state.filter_active && !app_state.modal_active && !app_state.is_detail_popup_open() => {

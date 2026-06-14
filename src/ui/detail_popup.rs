@@ -268,6 +268,24 @@ fn render_process_popup(
     ]));
     lines.push(Line::from(""));
 
+    // Add informational message for Network popup
+    if popup_type == DetailPopupType::Network {
+        lines.push(Line::from(vec![
+            Span::styled("⚠ ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "Per-process network I/O tracking requires eBPF (not yet implemented)",
+                Style::default().fg(Color::Yellow)
+            ),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled(
+                "  Showing processes by CPU activity as reference",
+                Style::default().fg(Color::DarkGray)
+            ),
+        ]));
+        lines.push(Line::from(""));
+    }
+
     // Table header
     let header = match popup_type {
         DetailPopupType::DiskIo => Line::from(vec![
@@ -299,7 +317,11 @@ fn render_process_popup(
     lines.push(header);
 
     // Calculate visible rows
-    let header_lines = 4;
+    let header_lines = if popup_type == DetailPopupType::Network {
+        7  // Sort line + blank + warning + description + blank + header + spacing
+    } else {
+        4  // Sort line + blank + header + spacing
+    };
     let footer_lines = 3;
     let visible_rows = (inner.height as usize).saturating_sub(header_lines + footer_lines);
 

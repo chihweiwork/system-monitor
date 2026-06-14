@@ -171,7 +171,9 @@ system-monitor
 
 ### 4. Network Monitor
 - **Main View**: Network activity summary
-- **Popup View**: Process network activity ranking
+- **Popup View**: Process activity ranking
+  - ⚠️ **Note**: Per-process network I/O tracking requires eBPF and is not yet implemented
+  - Currently shows processes by CPU activity as a proxy metric
 - **Sort Options**: PID, Name, User, CPU%
 
 ### 5. Disk I/O Monitor
