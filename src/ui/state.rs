@@ -339,7 +339,10 @@ impl DetailPopupState {
             },
             sort_order: SortOrder::Descending,
             show_full_command: false,
-            selected_index: None,
+            selected_index: match popup_type {
+                DetailPopupType::Process => Some(0),  // Pre-select first row for better UX
+                _ => None,  // Other popups don't support selection
+            },
         }
     }
 

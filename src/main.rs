@@ -669,6 +669,30 @@ fn handle_detail_popup_input(
                 KeyCode::Esc | KeyCode::Char('q') => {
                     app_state.close_detail_popup();
                 }
+
+                // Process-specific handlers MUST come before general handlers
+                // to avoid being shadowed by the general KeyCode::Down/Up patterns
+                KeyCode::Up if popup_type == ui::DetailPopupType::Process => {
+                    // Arrow up for selection in Process popup
+                    popup_state.select_prev(visible_height);
+                }
+                KeyCode::Down if popup_type == ui::DetailPopupType::Process => {
+                    // Arrow down for selection in Process popup
+                    popup_state.select_next(process_count, visible_height);
+                }
+                KeyCode::Enter if popup_type == ui::DetailPopupType::Process => {
+                    // Enter to open nested modal for selected process
+                    if let Some(selected_idx) = popup_state.get_selected_index() {
+                        // PID will be set in main loop from the filtered process list
+                        app_state.open_popup_modal(0); // Placeholder PID
+                    }
+                }
+                KeyCode::Char('c') if popup_type == ui::DetailPopupType::Process => {
+                    // Toggle full command display for Process popup
+                    popup_state.toggle_full_command();
+                }
+
+                // General handlers for all popups (fallback for non-Process popups)
                 KeyCode::Char('j') | KeyCode::Down => {
                     popup_state.scroll_down(1, 10000);
                 }
@@ -699,25 +723,6 @@ fn handle_detail_popup_input(
                     // Reverse sort order
                     popup_state.sort_order = popup_state.sort_order.toggle();
                     popup_state.scroll_offset = 0;
-                }
-                KeyCode::Char('c') if popup_type == ui::DetailPopupType::Process => {
-                    // Toggle full command display for Process popup
-                    popup_state.toggle_full_command();
-                }
-                KeyCode::Up if popup_type == ui::DetailPopupType::Process => {
-                    // Arrow up for selection in Process popup
-                    popup_state.select_prev(visible_height);
-                }
-                KeyCode::Down if popup_type == ui::DetailPopupType::Process => {
-                    // Arrow down for selection in Process popup
-                    popup_state.select_next(process_count, visible_height);
-                }
-                KeyCode::Enter if popup_type == ui::DetailPopupType::Process => {
-                    // Enter to open nested modal for selected process
-                    if let Some(selected_idx) = popup_state.get_selected_index() {
-                        // PID will be set in main loop from the filtered process list
-                        app_state.open_popup_modal(0); // Placeholder PID
-                    }
                 }
                 _ => {}
             }
