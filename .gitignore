@@ -7,3 +7,6 @@
 
 #/target
 .gitnexus
+
+# Release binaries (stored on GitHub Releases)
+release/

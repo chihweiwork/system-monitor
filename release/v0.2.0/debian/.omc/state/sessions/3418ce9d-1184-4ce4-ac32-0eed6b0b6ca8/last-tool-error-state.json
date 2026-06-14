@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"pwd && rtk ls -la release/v0.2.0/\",\"description\":\"检查当前目录结构\"}",
-  "error": "Exit code 2\n/home/chihwei/playground/system-monitor/release/v0.2.0/debian\n/usr/bin/ls: cannot access 'release/v0.2.0/': No such file or directory",
-  "timestamp": "2026-06-10T15:35:01.287Z",
-  "retry_count": 2
-}
